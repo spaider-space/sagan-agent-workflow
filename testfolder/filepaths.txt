@@ -1,5 +1,0 @@
-path to the test folder - /mnt/tier2/users/u101882/spaider-agent-template/testfolder/
-
-sample prompts: print out the file structure of testfolder
-
-print out the contents of filepaths.txt

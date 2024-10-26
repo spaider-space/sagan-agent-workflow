@@ -6,7 +6,9 @@ load_dotenv()
 
 '''AGENTSTATE IS THE MODE OF TRANSFER OF DATA BETWEEN NODES. WE'LL CHANGE IT ACCORDING TO WHAT OUR GRAPH NEEDS.'''
 class State(MessagesState):
-    pass
-
-# NOTE: THIS PARTICULAR PROJECT DOES NOT NEED A SCHEMA'S FILE SINCE WE ARE USING THE STANDARD MESSAGESSTATE AS OUR GRAPH STATE. 
-# I'M KEEPING THIS FILE TO SHOW ENABLE US TO HANDLE CUSTOM STATE DEFNS FOR FUTURE PROJECTS.
+    project_title: str
+    project_description: str
+    abstract_questions: list[str]
+    abstract_text: str
+    section_topics: list[str]
+    section_questions: dict[str, list[str]]
