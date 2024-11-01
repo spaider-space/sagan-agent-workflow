@@ -58,6 +58,32 @@ def ste_tools_condition(
         return "ste_toolnode"
     return "section_wise_question_generator"
 
+def sag_tools_condition(
+    state: Union[list[AnyMessage], dict[str, Any], BaseModel],
+) -> Literal["sag_toolnode", "plan_node"]:
+    """Use in the conditional_edge to route to the sag_toolnode if the last message
+    has tool calls. Otherwise, route to the plan_node.
+
+    Args:
+        state (Union[list[AnyMessage], dict[str, Any], BaseModel]): The state to check for
+            tool calls. Must have a list of messages (MessageGraph) or have the
+            "messages" key (StateGraph).
+
+    Returns:
+        The next node to route to.
+    """
+    if isinstance(state, list):
+        ai_message = state[-1]
+    elif isinstance(state, dict) and (messages := state.get("messages", [])):
+        ai_message = messages[-1]
+    elif messages := getattr(state, "messages", []):
+        ai_message = messages[-1]
+    else:
+        raise ValueError(f"No messages found in input state to tool_edge: {state}")
+    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        return "sag_toolnode"
+    return "plan_node"
+
 # NOTE on custom_tools_condition:
 # there's a built-in function called 'tools_condition' (import stmt: from langgraph.prebuilt import tools_condition) that routes between the END node and the TOOLS-NODE. I modified that defn to route between reporter and tools.
 

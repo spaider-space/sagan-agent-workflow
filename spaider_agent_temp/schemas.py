@@ -3,12 +3,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-'''AGENTSTATE IS THE MODE OF TRANSFER OF DATA BETWEEN NODES. WE'LL CHANGE IT ACCORDING TO WHAT OUR GRAPH NEEDS.'''
 class State(MessagesState):
     project_title: str
     project_description: str
     abstract_questions: list[str]
     abstract_text: str
     section_topics: list[str]
-    section_questions: dict[str, list[str]]
+    section_questions: dict[str, list[str]] # key = section_topic, value = list of questions.
+    section_answers: dict[str, list[str]] # key = section_topic, value = list of answers.
+    plan: str
+    draft: str

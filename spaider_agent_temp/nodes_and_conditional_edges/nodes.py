@@ -2,9 +2,10 @@ import json
 import logging
 from typing import List
 from langgraph.prebuilt import ToolNode
-from langchain_core.messages import SystemMessage, AnyMessage
+from langchain_core.messages import SystemMessage, AnyMessage, HumanMessage
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from colorama import init, Fore, Back, Style
 
 '''LOCAL IMPORTS'''
 from schemas import State
@@ -18,6 +19,7 @@ from tools.web_tool import web_search_tool
 from tools.query_chromadb import query_chromadb
 
 load_dotenv()
+init()
 
 terminal_tools = [run_script, get_file_tree]
 research_tools = [query_chromadb]
@@ -55,7 +57,7 @@ class SectionTopicExtractorOutput(BaseModel):
 
 class SectionWiseQuestionGeneratorOutput(BaseModel):
     """Ensure that this is the output of the section_wise_question_generator node."""
-    section_questions: dict[str, list[str]] = Field(description="A dictionary of sections and their corresponding questions.")
+    section_questions: dict[str, list[str]] = Field(description="A dictionary of sections and their corresponding list of questions.")
 
 
 terminal_tools_node = ToolNode(terminal_tools)
@@ -65,14 +67,14 @@ def prompt_parser(state: State) -> State:
     """
     Given a user prompt, this node parses the prompt to extract the project title and description based on the project title.
     """
-    print("################ PROMPT PARSER BEGIN #################")
+    print(f"{Fore.YELLOW}################ PROMPT PARSER BEGIN #################")
     system_prompt = SystemMessage(PROMPT_PARSER_PROMPT)
     state["messages"].append(system_prompt)
 
     try:
         response = llm.invoke(state["messages"])
-        print(f"Response content: {response.content}")
-        print(f"Response type: {type(response)}")
+        # print(f"Response content: {response.content}")
+        # print(f"Response type: {type(response)}")
 
         if not response or not hasattr(response, 'content'):
             raise ValueError("Invalid response from LLM.")
@@ -84,31 +86,51 @@ def prompt_parser(state: State) -> State:
             raise ValueError("Project title or description not found in the structured output.")
 
         # print(f"Response content: {response.content}")
-        print(f"Project title: {structured_response.project_title}")
-        print(f"Project description: {structured_response.project_description}")
-        print("################ PROMPT PARSER END #################")
-        return {"messages": [response], "project_title": structured_response.project_title, "project_description": structured_response.project_description}
+        # print(f"Project title: {structured_response.project_title}")
+        # print(f"Project description: {structured_response.project_description}")
+        
+        # Updating state before end-of-node logging
+        state["messages"] = [response]
+        state["project_title"] = structured_response.project_title
+        state["project_description"] = structured_response.project_description
+
+        print(f"\n\n\n\nstate at the end of prompt_parser: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ PROMPT PARSER END #################{Style.RESET_ALL}")
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ PROMPT PARSER END #################")
-        return {"messages": [str(e)], "project_title": None, "project_description": None}
+        print(f"################ PROMPT PARSER END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["project_title"] = None
+        state["project_description"] = None
+        return state
     
 def abstract_questions_generator(state: State) -> State:
     """
     Given the project title and description, this node creates a list of questions that may help it understand the project better. The answers to these questions will then be used to create a project abstract.
     """
-    print("################ ABSTRACT QUESTIONS GENERATOR BEGIN #################")
+    print(f"{Fore.RED}################ ABSTRACT QUESTIONS GENERATOR BEGIN #################")
     project_title = state["project_title"]
     project_description = state["project_description"]
     system_prompt = SystemMessage(ABSTRACT_QUESTIONS_GENERATOR_PROMPT.format(project_title=project_title, project_description=project_description))
-
     state["messages"].append(system_prompt)
 
     try:
         response = llm.invoke(state["messages"])
-        print(f"Response content: {response.content}")
-        print(f"Response type: {type(response)}")
+        # print(f"Response content: {response.content}")
+        # print(f"Response type: {type(response)}")
 
         if not response or not hasattr(response, 'content'):
             raise ValueError("Invalid response from LLM.")
@@ -120,20 +142,39 @@ def abstract_questions_generator(state: State) -> State:
             raise ValueError("Abstract questions not found in the structured output.")
 
         # print(f"Response content: {response.content}")
-        print(f"Abstract questions: {structured_response.abstract_questions}")
-        print("################ ABSTRACT QUESTIONS GENERATOR END #################")
-        return {"messages": [response], "abstract_questions": structured_response.abstract_questions}
+        # print(f"Abstract questions: {structured_response.abstract_questions}")
+
+        # Updating state before end-of-node logging
+
+        state["messages"] = [response]
+        state["abstract_questions"] = structured_response.abstract_questions
+        print(f"\n\n\n\nstate at the end of abstract_questions_generator: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ ABSTRACT QUESTIONS GENERATOR END #################{Style.RESET_ALL}")
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ ABSTRACT QUESTIONS GENERATOR END #################")
-        return {"messages": [str(e)], "abstract_questions": None}
+        print(f"################ ABSTRACT QUESTIONS GENERATOR END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["abstract_questions"] = None
+        return state
 
 def abstract_answers_generator(state: State) -> State:
     """
     Given the list of questions, this node creates answers to the questions generated by the abstract_questions_generator node.
     """
-    print("################ ABSTRACT ANSWERS GENERATOR BEGIN #################")
+    print(f"{Fore.BLUE}################ ABSTRACT ANSWERS GENERATOR BEGIN #################")
     abstract_questions = state["abstract_questions"]
     system_prompt = SystemMessage(ABSTRACT_ANSWERS_GENERATOR_PROMPT.format(questions_list=abstract_questions))
     state["messages"].append(system_prompt)
@@ -147,11 +188,13 @@ def abstract_answers_generator(state: State) -> State:
                 "sentence-transformers/all-MiniLM-L6-v2",
                 question
             )
-            answer = llm.invoke(result)
+            answer = llm.invoke((f"Frame the following texts into one cohesive answer: {result}"))
             qa_pairs[question] = answer.content
+            # print(f"Question: {question}\nAnswer: {answer.content} \n\n\n\n")
 
         # Now use the LLM to generate an abstract based on the retrieved answers
-        abstract_prompt = f"Based on the following question-answer pairs, generate a concise abstract for the JEDI Cloud project:\n\n"
+        project_title = state["project_title"]
+        abstract_prompt = f"Based on the following question-answer pairs, generate a concise abstract for the {project_title} project:\n\n"
         for q, a in qa_pairs.items():
             abstract_prompt += f"Q: {q}\nA: {a}\n\n"
         
@@ -163,28 +206,48 @@ def abstract_answers_generator(state: State) -> State:
             abstract_text=abstract_text
         )
 
-        print(f"Abstract QA pairs: {structured_response.abstract_qa_pairs}")
-        print(f"Abstract text: {structured_response.abstract_text}")
-        print("################ ABSTRACT ANSWERS GENERATOR END #################")
-        return {"messages": [abstract_response], "abstract_text": structured_response.abstract_text}
+        # print(f"Abstract QA pairs: {structured_response.abstract_qa_pairs}")
+        # print(f"\n\n\n\nAbstract text: {structured_response.abstract_text}")
+        
+        # Updating state before end-of-node logging
+        state["messages"] = [abstract_response]
+        state["abstract_text"] = structured_response.abstract_text
+        print(f"\n\n\n\nstate at the end of abstract_answers_generator: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ ABSTRACT ANSWERS GENERATOR END #################{Style.RESET_ALL}")
+
+
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ ABSTRACT ANSWERS GENERATOR END #################")
-        return {"messages": [str(e)], "abstract_text": None}
+        print(f"################ ABSTRACT ANSWERS GENERATOR END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["abstract_text"] = None
+        return state
 
 def section_topic_extractor(state: State) -> State:
     """
     This node extracts the topics for each section of the project from the template pdf given by the user.
     """
-    print("################ SECTION TOPIC EXTRACTOR BEGIN #################")
+    print(f"{Fore.CYAN}################ SECTION TOPIC EXTRACTOR BEGIN #################")
     system_prompt = SystemMessage(SECTION_TOPIC_EXTRACTOR_PROMPT)
     state["messages"].append(system_prompt)
 
     try:
         response = llm_with_research_tools.invoke(state["messages"])
-        print(f"Response content: {response.content}")
-        print(f"Response type: {type(response)}")
+        # print(f"Response content: {response.content}")
+        # print(f"Response type: {type(response)}")
 
         if not response or not hasattr(response, 'content'):
             raise ValueError("Invalid response from LLM.")
@@ -196,98 +259,226 @@ def section_topic_extractor(state: State) -> State:
             raise ValueError("Section topics not found in the structured output.")
 
         # print(f"Response content: {response.content}")
-        print(f"Section topics: {structured_response.section_topics}")
-        print("################ SECTION TOPIC EXTRACTOR END #################")
-        return {"messages": [response], "section_topics": structured_response.section_topics}
+        # print(f"Section topics: {structured_response.section_topics}")
+        
+        # Updating state before end-of-node logging
+        state["messages"] = [response]
+        state["section_topics"] = structured_response.section_topics
+        print(f"\n\n\n\nstate at the end of section_topic_extractor: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ SECTION TOPIC EXTRACTOR END #################{Style.RESET_ALL}")
+
+
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ SECTION TOPIC EXTRACTOR END #################")
-        return {"messages": [str(e)], "section_topics": None}
+        print(f"################ SECTION TOPIC EXTRACTOR END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["section_topics"] = None
+        return state
 
 def section_wise_question_generator(state: State) -> State:
     """
     Given the list of sections, this node creates a list of questions for each section.
     """
-    print("################ SECTION WISE QUESTION GENERATOR BEGIN #################")
+    print(f"{Fore.MAGENTA}################ SECTION WISE QUESTION GENERATOR BEGIN #################")
     section_topics = state["section_topics"]
     system_prompt = SystemMessage(SECTION_WISE_QUESTION_GENERATOR_PROMPT.format(section_topics=section_topics))
-
     state["messages"].append(system_prompt)
 
     try:
         response = llm.invoke(state["messages"])
-        print(f"Response content: {response.content}")
-        print(f"Response type: {type(response)}")
+        
+        # Parse the response content to create the section_questions dictionary
+        section_questions = {}
+        current_section = None
+        
+        # Split the content by lines and process each line
+        for line in response.content.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check if line is a section header (starts with number and has **)
+            if line.startswith(('1.', '2.', '3.', '4.', '5.', '6.')) and '**' in line:
+                # Extract section type between ** **
+                section_start = line.find('**') + 2
+                section_end = line.find('**', section_start)
+                if section_end != -1:
+                    current_section = line[section_start:section_end].strip()
+                    section_questions[current_section] = []
+            
+            # If line starts with - and we have a current section, it's a question
+            elif line.startswith('-') and current_section:
+                question = line[1:].strip()
+                section_questions[current_section].append(question)
+        # llm_with_structured_output = llm.with_structured_output(SectionWiseQuestionGeneratorOutput)
+        # section_questions = llm_with_structured_output.invoke(response.content)
 
-        if not response or not hasattr(response, 'content'):
-            raise ValueError("Invalid response from LLM.")
+        # Updating state before end-of-node logging
+        state["messages"] = [response]
+        state["section_questions"] = section_questions
+        print(f"\n\n\n\nstate at the end of section_wise_question_generator: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ SECTION WISE QUESTION GENERATOR END #################{Style.RESET_ALL}")
 
-        llm_with_structured_output = llm.with_structured_output(SectionWiseQuestionGeneratorOutput)
-        structured_response = llm_with_structured_output.invoke(response.content)
 
-        if not hasattr(structured_response, 'section_questions'):
-            raise ValueError("Section questions not found in the structured output.")
-
-        # print(f"Response content: {response.content}")
-        print(f"Section questions: {structured_response.section_questions}")
-        print("################ SECTION WISE QUESTION GENERATOR END #################")
-        return {"messages": [response], "section_questions": structured_response.section_questions}
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ SECTION WISE QUESTION GENERATOR END #################")
-        return {"messages": [str(e)], "section_questions": None}
+        print(f"################ SECTION WISE QUESTION GENERATOR END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["section_questions"] = None
+        return state
 
-def abstract_answers_generator(state: State) -> State:
+def section_wise_answers_generator(state: State) -> State:
     """
-    Given the list of questions, this node creates answers to the questions generated by the abstract_questions_generator node.
+    Given the dictionary of section-wise questions, this node finds answers to the questions
+    generated by the section_wise_question_generator node.
     """
-    print("################ ABSTRACT ANSWERS GENERATOR BEGIN #################")
-    abstract_questions = state["abstract_questions"]
-    system_prompt = SystemMessage(ABSTRACT_ANSWERS_GENERATOR_PROMPT.format(questions_list=abstract_questions))
-    state["messages"].append(system_prompt)
+    print(f"{Fore.GREEN}################ SECTION WISE ANSWERS GENERATOR BEGIN #################")
+    section_questions = state.get("section_questions")
+    if not section_questions:
+        error_msg = "No section questions found in state. Previous node may have failed."
+        print(f"Error: {error_msg}")
+        print(f"################ SECTION WISE ANSWERS GENERATOR END #################{Style.RESET_ALL}")
+        return {
+            "messages": [SystemMessage(content=error_msg)],
+            "section_answers": None
+        }
 
     try:
-        # Use the research tools to actually query the database
-        qa_pairs = {}
-        for question in abstract_questions:
-            result = query_chromadb(
-                "C:\\Users\\ketan\\Desktop\\SPAIDER-SPACE\\sagan_workflow\\ingest_data\\mychroma_db",
-                "sentence-transformers/all-MiniLM-L6-v2",
-                question
-            )
-            answer = llm.invoke(result)
-            qa_pairs[question] = answer.content
-
-        # Now use the LLM to generate an abstract based on the retrieved answers
-        abstract_prompt = f"Based on the following question-answer pairs, generate a concise abstract for the JEDI Cloud project:\n\n"
-        for q, a in qa_pairs.items():
-            abstract_prompt += f"Q: {q}\nA: {a}\n\n"
+        section_answers = {}
         
-        abstract_response = llm.invoke(abstract_prompt)
-        abstract_text = abstract_response.content
+        for section, questions in section_questions.items():
+            section_answers[section] = []
+            for question in questions:
+                result = query_chromadb(
+                    "C:\\Users\\ketan\\Desktop\\SPAIDER-SPACE\\sagan_workflow\\ingest_data\\mychroma_db",
+                    "sentence-transformers/all-MiniLM-L6-v2",
+                    question
+                )
+                answer = llm.invoke((f"Frame the following texts into one cohesive answer: {result}"))
+                section_answers[section].append(answer.content)
 
-        structured_response = AbstractAnswersGeneratorOutput(
-            abstract_qa_pairs=qa_pairs,
-            abstract_text=abstract_text
-        )
+        # Updating state before end-of-node logging
+        state["messages"] = [SystemMessage(content="Section-wise answers generated successfully")]
+        state["section_answers"] = section_answers
 
-        print(f"Abstract QA pairs: {structured_response.abstract_qa_pairs}")
-        print(f"Abstract text: {structured_response.abstract_text}")
-        print("################ ABSTRACT ANSWERS GENERATOR END #################")
-        return {"messages": [abstract_response], "abstract_text": structured_response.abstract_text}
+        print(f"\n\n\n\nstate at the end of section_wise_answers_generator: \n")
+        print("Messages: ")
+        messages = state["messages"]
+        if len(messages) >= 3:
+            for message in messages[-3:]:
+                print(f"{message.type}: {message.content}")
+        else:
+            for message in messages:
+                print(f"{message.type}: {message.content}")
+        for field_name, field_value in state.items():
+            if field_name != "messages":
+                print(f"- {field_name}: {field_value}")
+        print(f"################ SECTION WISE ANSWERS GENERATOR END #################{Style.RESET_ALL}")
+        return state
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        print("################ ABSTRACT ANSWERS GENERATOR END #################")
-        return {"messages": [str(e)], "abstract_text": None}
+        print(f"################ SECTION WISE ANSWERS GENERATOR END #################{Style.RESET_ALL}")
+        state["messages"] = [str(e)]
+        state["section_answers"] = None
+        return state
 
-def reporter(state: State):
-    """
-    This function is used to talk to the user like a regular chatbot.
-    """
-    return {"messages": llm.invoke(state["messages"])}
+def plan_node(state: State):
+    print(f"{Fore.LIGHTYELLOW_EX}################ PLAN NODE BEGIN #################")
+    messages = [
+        SystemMessage(content=PLAN_PROMPT), 
+        HumanMessage(content=f"Project abstract: {state['abstract_text']}\n\nSection-wise texts: {state['section_answers']}")
+    ]
+    response = llm.invoke(messages)
+
+    # Updating state before end-of-node logging
+    state["messages"] = [response]
+    state["plan"] = response.content
+    print(f"\n\n\n\nstate at the end of plan_node: \n")
+    print("Messages: ")
+    messages = state["messages"]
+    if len(messages) >= 3:
+        for message in messages[-3:]:
+            print(f"{message.type}: {message.content}")
+    else:
+        for message in messages:
+            print(f"{message.type}: {message.content}")
+    for field_name, field_value in state.items():
+        if field_name != "messages":
+            print(f"- {field_name}: {field_value}")
+    print(f"################ PLAN NODE END #################{Style.RESET_ALL}")
+
+
+    return state
+
+def generation_node(state: State):
+    print(f"{Fore.LIGHTGREEN_EX}################ GENERATION NODE BEGIN #################")
+    section_texts = state["section_answers"]
+    plan = state["plan"]
+    user_message = HumanMessage(
+        content=f"\n\nHere is my plan:\n\n{plan}\n\nHere are the section-wise texts:\n\n{section_texts}")
+    messages = [
+        SystemMessage(
+            content=WRITER_PROMPT
+        ),
+        user_message
+        ]
+    response = llm.invoke(messages)
+    # print(f"\n\n\n\nDraft: {response.content}")
+
+    # Updating state before end-of-node logging
+    state["messages"] = [response]
+    state["draft"] = response.content
+    print(f"\n\n\n\nstate at the end of generation_node: \n")
+    print("Messages: ")
+    messages = state["messages"]
+    if len(messages) >= 3:
+        for message in messages[-3:]:
+            print(f"{message.type}: {message.content}")
+    else:
+        for message in messages:
+            print(f"{message.type}: {message.content}")
+    for field_name, field_value in state.items():
+        if field_name != "messages":
+            print(f"- {field_name}: {field_value}")
+    print(f"################ GENERATION NODE END #################{Style.RESET_ALL}")
+    return state
+
+
+
+# def reporter(state: State):
+#     """
+#     This function is used to talk to the user like a regular chatbot.
+#     """
+#     print(f"{Fore.WHITE}################ REPORTER BEGIN #################{Style.RESET_ALL}")
+#     print(f"################ REPORTER END #################{Style.RESET_ALL}")
+#     return {"messages": llm.invoke(state["messages"])}
 
 
 
