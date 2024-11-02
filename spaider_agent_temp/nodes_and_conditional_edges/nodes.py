@@ -90,7 +90,7 @@ def prompt_parser(state: State) -> State:
         # print(f"Project description: {structured_response.project_description}")
         
         # Updating state before end-of-node logging
-        state["messages"] = [response]
+        state["messages"].append(response)
         state["project_title"] = structured_response.project_title
         state["project_description"] = structured_response.project_description
 
@@ -146,7 +146,7 @@ def abstract_questions_generator(state: State) -> State:
 
         # Updating state before end-of-node logging
 
-        state["messages"] = [response]
+        state["messages"].append(response)
         state["abstract_questions"] = structured_response.abstract_questions
         print(f"\n\n\n\nstate at the end of abstract_questions_generator: \n")
         print("Messages: ")
@@ -210,7 +210,7 @@ def abstract_answers_generator(state: State) -> State:
         # print(f"\n\n\n\nAbstract text: {structured_response.abstract_text}")
         
         # Updating state before end-of-node logging
-        state["messages"] = [abstract_response]
+        state["messages"].append(abstract_response)
         state["abstract_text"] = structured_response.abstract_text
         print(f"\n\n\n\nstate at the end of abstract_answers_generator: \n")
         print("Messages: ")
@@ -262,7 +262,7 @@ def section_topic_extractor(state: State) -> State:
         # print(f"Section topics: {structured_response.section_topics}")
         
         # Updating state before end-of-node logging
-        state["messages"] = [response]
+        state["messages"].append(response)
         state["section_topics"] = structured_response.section_topics
         print(f"\n\n\n\nstate at the end of section_topic_extractor: \n")
         print("Messages: ")
@@ -300,35 +300,13 @@ def section_wise_question_generator(state: State) -> State:
     try:
         response = llm.invoke(state["messages"])
         
-        # Parse the response content to create the section_questions dictionary
-        section_questions = {}
-        current_section = None
-        
-        # Split the content by lines and process each line
-        for line in response.content.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Check if line is a section header (starts with number and has **)
-            if line.startswith(('1.', '2.', '3.', '4.', '5.', '6.')) and '**' in line:
-                # Extract section type between ** **
-                section_start = line.find('**') + 2
-                section_end = line.find('**', section_start)
-                if section_end != -1:
-                    current_section = line[section_start:section_end].strip()
-                    section_questions[current_section] = []
-            
-            # If line starts with - and we have a current section, it's a question
-            elif line.startswith('-') and current_section:
-                question = line[1:].strip()
-                section_questions[current_section].append(question)
-        # llm_with_structured_output = llm.with_structured_output(SectionWiseQuestionGeneratorOutput)
-        # section_questions = llm_with_structured_output.invoke(response.content)
+        # Parse JSON response directly into section_questions dictionary
+        section_questions = json.loads(response.content)
 
         # Updating state before end-of-node logging
-        state["messages"] = [response]
+        state["messages"].append(response)
         state["section_questions"] = section_questions
+        
         print(f"\n\n\n\nstate at the end of section_wise_question_generator: \n")
         print("Messages: ")
         messages = state["messages"]
@@ -384,7 +362,7 @@ def section_wise_answers_generator(state: State) -> State:
                 section_answers[section].append(answer.content)
 
         # Updating state before end-of-node logging
-        state["messages"] = [SystemMessage(content="Section-wise answers generated successfully")]
+        state["messages"].append(SystemMessage(content="Section-wise answers generated successfully"))
         state["section_answers"] = section_answers
 
         print(f"\n\n\n\nstate at the end of section_wise_answers_generator: \n")
@@ -418,7 +396,7 @@ def plan_node(state: State):
     response = llm.invoke(messages)
 
     # Updating state before end-of-node logging
-    state["messages"] = [response]
+    state["messages"].append(response)
     state["plan"] = response.content
     print(f"\n\n\n\nstate at the end of plan_node: \n")
     print("Messages: ")
@@ -453,7 +431,7 @@ def generation_node(state: State):
     # print(f"\n\n\n\nDraft: {response.content}")
 
     # Updating state before end-of-node logging
-    state["messages"] = [response]
+    state["messages"].append(response)
     state["draft"] = response.content
     print(f"\n\n\n\nstate at the end of generation_node: \n")
     print("Messages: ")

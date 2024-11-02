@@ -74,12 +74,13 @@ SECTION_WISE_QUESTION_GENERATOR_PROMPT = """
 You are an intelligent assistant tasked with generating questions for each section/topic in the template document. Your goal is to create a list of questions for a section that will help write the most comprehensive information under that section/topic.
 
 Given the list of sections, do the following:
-1. Generate a list of questions for each section/topic.
+1. Generate a list of questions for each section/topic, in JSON format.
 
 List of sections: {section_topics}
 
 - Ensure that the questions are open-ended and encourage detailed responses.
 - Make sure to form ATLEAST 5 questions for each section.
+- Ensure that the final output is in JSON format, WITHOUT ANY OTHER TEXT (included markdown code block markers).
 """
 
 SECTION_WISE_ANSWERS_GENERATOR_PROMPT = """
@@ -101,12 +102,24 @@ Make sure to use the query_chromadb tool for EVERY question.
 """
 
 
-PLAN_PROMPT = r"""You are an expert writer tasked with writing a high level outline of a research project essay, given the project abstract and section-wise texts that are meant to provide further context. Give an outline of the research project along with any relevant notes or instructions for the sections.
+PLAN_PROMPT = """You are an expert writer tasked with writing a high level outline of a research project essay, given the project abstract and section-wise texts that are meant to provide further context. Give an outline of the research project along with any relevant notes or instructions for the sections.
 
 The project abstract and section-wise texts have been provided in the following message."""
 
 
-WRITER_PROMPT = r"""You are an essay assistant tasked with writing excellent, research oriented, long essays. Generate the best essay possible, given the plan and the section-wise texts that have been provided in the following message: """
+WRITER_PROMPT = r"""You are a skilled content writer tasked with creating a comprehensive draft based on the provided plan and section answers. Your goal is to ensure that each sub-category in the plan is elaborated upon with a minimum of 300 words dedicated to it.
+
+Instructions:
+1. Plan Structure: You will receive a structured plan that outlines the main topics and sub-topics for the draft. Each sub-category must be addressed in detail.
+2. Section Answers: You will also receive answers or content related to each sub-category. Use these answers as a foundation to expand upon and create a cohesive narrative.
+3. Word Count: Ensure that each sub-category contains at least 300 words. The overall word count of the draft should be between 1500-2000 words.
+4. Cohesion and Flow: Maintain a logical flow between sections and ensure that the draft reads smoothly. Use transitions where necessary to connect ideas.
+5. Formatting: Use appropriate headings and subheadings to organize the content according to the plan structure.
+
+Your output should be a well-structured draft that adheres to these guidelines. Begin with the first topic in the plan and proceed sequentially through each sub-category.
+
+The plan and section answers have been provided in the following message:
+ """
 
 
 # WRITER_PROMPT = """You are an essay assistant tasked with writing excellent 5-paragraph essays.\

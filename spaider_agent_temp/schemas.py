@@ -11,5 +11,5 @@ class State(MessagesState):
     section_topics: list[str]
     section_questions: dict[str, list[str]] # key = section_topic, value = list of questions.
     section_answers: dict[str, list[str]] # key = section_topic, value = list of answers.
-    plan: str
+    plan: dict[str, list[str]] # key = section_topic, value = list of steps.
     draft: str
