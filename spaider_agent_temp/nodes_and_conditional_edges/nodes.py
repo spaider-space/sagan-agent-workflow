@@ -436,6 +436,9 @@ def generation_node(state: State):
     print(f"\n\n\n\nstate at the end of generation_node: \n")
     print("Messages: ")
     messages = state["messages"]
+    output_path = "C:\\Users\\ketan\\Desktop\\SPAIDER-SPACE\\sagan_workflow\\output\\output.md"
+    with open(output_path, "w", encoding="utf-8") as file:
+        file.write(state["draft"])
     if len(messages) >= 3:
         for message in messages[-3:]:
             print(f"{message.type}: {message.content}")
